@@ -1,7 +1,21 @@
 #!/bin/bash
 
-# *Todo: Find a way to ensure that this import only happens once:
-mongoimport --db $OPENSHIFT_APP_NAME --collection parks --host $OPENSHIFT_MONGODB_DB_HOST --username $OPENSHIFT_MONGODB_DB_USERNAME --password $OPENSHIFT_MONGODB_DB_PASSWORD --port $OPENSHIFT_MONGODB_DB_PORT --type json --file $OPENSHIFT_REPO_DIR/parkcoord.json
+GETCOLL_SCRIPT=$OPENSHIFT_REPO_DIR/php/get_collection.js
+
+(echo "conn = new Mongo(\"$OPENSHIFT_MONGODB_DB_HOST:$OPENSHIFT_MONGODB_DB_PORT\");" ; \
+ echo "db = conn.getDB(\"$OPENSHIFT_APP_NAME\");" ; \
+ echo "db.auth('$OPENSHIFT_MONGODB_DB_USERNAME','$OPENSHIFT_MONGODB_DB_PASSWORD');" ; \
+ echo "printjson(db.getCollectionNames());" ) > $GETCOLL_SCRIPT
+
+COLLECTION_PARKS_EXISTS=`mongo --host $OPENSHIFT_MONGODB_DB_HOST --port $OPENSHIFT_MONGODB_DB_PORT --quiet $GETCOLL_SCRIPT | grep songs | wc -l`
+rm $GETCOLL_SCRIPT
+
+if [ "$COLLECTION_PARKS_EXISTS" == "0" ]; then
+  echo "Import parks ..."
+  mongoimport --db $OPENSHIFT_APP_NAME --collection parks \
+              --host $OPENSHIFT_MONGODB_DB_HOST --username $OPENSHIFT_MONGODB_DB_USERNAME --password $OPENSHIFT_MONGODB_DB_PASSWORD --port $OPENSHIFT_MONGODB_DB_PORT \
+              --type json --file $OPENSHIFT_REPO_DIR/parkcoord.json
+fi
 
 # add a spatial index to our collection:
 pushd $OPENSHIFT_REPO_DIR/php
